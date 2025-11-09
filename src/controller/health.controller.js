@@ -1,5 +1,5 @@
 const healthCheck = (req, res) => {
-  res.send("App is running...");
+  res.send("App is running.");
 };
 
 module.exports = { healthCheck };

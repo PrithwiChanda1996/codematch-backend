@@ -3,7 +3,7 @@ const app = express();
 const port = 3000;
 
 // Import all routes
-const routes = require("./routes");
+const routes = require("./src/routes");
 
 app.use("/", routes);
 
