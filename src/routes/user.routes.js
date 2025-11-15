@@ -14,6 +14,7 @@ const {
   validateGetUserByMobile,
   validateLogin,
 } = require("../middlewares/validation.middleware");
+const { authenticate } = require("../middlewares/auth.middleware");
 
 // POST /api/users/signup - User registration
 router.post("/signup", validateSignup, signup);
@@ -21,15 +22,16 @@ router.post("/signup", validateSignup, signup);
 // POST /api/users/login - User login
 router.post("/login", validateLogin, login);
 
-// GET /api/users/:id - Get user by ID
-router.get("/:id", validateGetUserById, getUserById);
+// GET /api/users/:id - Get user by ID (protected)
+router.get("/:id", authenticate, validateGetUserById, getUserById);
 
-// GET /api/users/email/:email - Get user by email
-router.get("/email/:email", validateGetUserByEmail, getUserByEmail);
+// GET /api/users/email/:email - Get user by email (protected)
+router.get("/email/:email", authenticate, validateGetUserByEmail, getUserByEmail);
 
-// GET /api/users/mobile/:mobileNumber - Get user by mobile number
+// GET /api/users/mobile/:mobileNumber - Get user by mobile number (protected)
 router.get(
   "/mobile/:mobileNumber",
+  authenticate,
   validateGetUserByMobile,
   getUserByMobileNumber
 );
