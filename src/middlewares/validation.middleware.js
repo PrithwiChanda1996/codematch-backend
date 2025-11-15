@@ -272,10 +272,144 @@ const validateLogin = (req, res, next) => {
   next();
 };
 
+// Joi schema for profile update validation
+const updateProfileSchema = Joi.object({
+  firstName: Joi.string().min(2).max(50).trim().optional().messages({
+    "string.min": "First name must be at least 2 characters long",
+    "string.max": "First name cannot exceed 50 characters",
+  }),
+
+  lastName: Joi.string().min(2).max(50).trim().optional().messages({
+    "string.min": "Last name must be at least 2 characters long",
+    "string.max": "Last name cannot exceed 50 characters",
+  }),
+
+  age: Joi.number().min(18).max(100).optional().messages({
+    "number.base": "Age must be a number",
+    "number.min": "Age must be at least 18",
+    "number.max": "Age cannot exceed 100",
+  }),
+
+  gender: Joi.string()
+    .valid("male", "female", "other")
+    .lowercase()
+    .optional()
+    .messages({
+      "any.only": "Gender must be either male, female, or other",
+    }),
+
+  // Professional Profile Fields (Optional)
+  skills: Joi.array()
+    .items(Joi.string().valid(...VALID_SKILLS))
+    .max(10)
+    .optional()
+    .messages({
+      "array.max": "Maximum 10 skills allowed",
+      "any.only": "Please provide valid skills from the predefined list",
+    }),
+
+  bio: Joi.string()
+    .trim()
+    .min(100)
+    .max(500)
+    .optional()
+    .messages({
+      "string.min": "Bio must be at least 100 characters long",
+      "string.max": "Bio cannot exceed 500 characters",
+    }),
+
+  currentPosition: Joi.string()
+    .trim()
+    .max(100)
+    .optional()
+    .messages({
+      "string.max": "Current position cannot exceed 100 characters",
+    }),
+
+  currentOrganisation: Joi.string()
+    .trim()
+    .max(100)
+    .optional()
+    .messages({
+      "string.max": "Current organisation cannot exceed 100 characters",
+    }),
+
+  location: Joi.string()
+    .trim()
+    .max(100)
+    .optional()
+    .messages({
+      "string.max": "Location cannot exceed 100 characters",
+    }),
+
+  // Profile Media
+  profilePhoto: Joi.string()
+    .trim()
+    .uri()
+    .pattern(/^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|svg)$/i)
+    .optional()
+    .messages({
+      "string.uri": "Please provide a valid URL",
+      "string.pattern.base": "Please provide a valid image URL (jpg, jpeg, png, gif, webp, svg)",
+    }),
+
+  // Social & Portfolio Links
+  githubUrl: Joi.string()
+    .trim()
+    .uri()
+    .pattern(/^https?:\/\/(www\.)?github\.com\/.+$/)
+    .optional()
+    .messages({
+      "string.uri": "Please provide a valid URL",
+      "string.pattern.base": "Please provide a valid GitHub URL",
+    }),
+
+  linkedinUrl: Joi.string()
+    .trim()
+    .uri()
+    .pattern(/^https?:\/\/(www\.)?linkedin\.com\/.+$/)
+    .optional()
+    .messages({
+      "string.uri": "Please provide a valid URL",
+      "string.pattern.base": "Please provide a valid LinkedIn URL",
+    }),
+
+  portfolioUrl: Joi.string()
+    .trim()
+    .uri()
+    .optional()
+    .messages({
+      "string.uri": "Please provide a valid portfolio URL",
+    }),
+}).min(1).messages({
+  "object.min": "At least one field must be provided for update",
+});
+
+// Validation middleware for profile update
+const validateUpdateProfile = (req, res, next) => {
+  const { error, value } = updateProfileSchema.validate(req.body, {
+    abortEarly: false,
+    stripUnknown: true,
+  });
+
+  if (error) {
+    const errorMessages = error.details.map((detail) => detail.message);
+    return res.status(400).json({
+      success: false,
+      message: "Validation error",
+      errors: errorMessages,
+    });
+  }
+
+  req.body = value;
+  next();
+};
+
 module.exports = {
   validateSignup,
   validateGetUserById,
   validateGetUserByEmail,
   validateGetUserByMobile,
   validateLogin,
+  validateUpdateProfile,
 };

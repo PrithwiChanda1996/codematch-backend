@@ -79,10 +79,31 @@ const login = async (req, res, next) => {
   }
 };
 
+// Update profile controller
+const updateProfile = async (req, res, next) => {
+  try {
+    // User ID is set by authorization middleware
+    const userId = req.userId;
+
+    // Call service layer to update profile
+    const updatedUser = await userService.updateUserProfile(userId, req.body);
+
+    // Send success response
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      data: updatedUser,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   signup,
   getUserById,
   getUserByEmail,
   getUserByMobileNumber,
   login,
+  updateProfile,
 };

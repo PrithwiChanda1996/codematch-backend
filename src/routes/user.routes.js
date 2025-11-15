@@ -6,6 +6,7 @@ const {
   getUserByEmail,
   getUserByMobileNumber,
   login,
+  updateProfile,
 } = require("../controller/user.controller");
 const {
   validateSignup,
@@ -13,8 +14,12 @@ const {
   validateGetUserByEmail,
   validateGetUserByMobile,
   validateLogin,
+  validateUpdateProfile,
 } = require("../middlewares/validation.middleware");
 const { authenticate } = require("../middlewares/auth.middleware");
+const {
+  authorizeOwnProfile,
+} = require("../middlewares/authorization.middleware");
 
 // POST /api/users/signup - User registration
 router.post("/signup", validateSignup, signup);
@@ -22,11 +27,25 @@ router.post("/signup", validateSignup, signup);
 // POST /api/users/login - User login
 router.post("/login", validateLogin, login);
 
+// PATCH /api/users/profile - Update user profile (protected)
+router.patch(
+  "/profile",
+  authenticate,
+  authorizeOwnProfile,
+  validateUpdateProfile,
+  updateProfile
+);
+
 // GET /api/users/:id - Get user by ID (protected)
 router.get("/:id", authenticate, validateGetUserById, getUserById);
 
 // GET /api/users/email/:email - Get user by email (protected)
-router.get("/email/:email", authenticate, validateGetUserByEmail, getUserByEmail);
+router.get(
+  "/email/:email",
+  authenticate,
+  validateGetUserByEmail,
+  getUserByEmail
+);
 
 // GET /api/users/mobile/:mobileNumber - Get user by mobile number (protected)
 router.get(

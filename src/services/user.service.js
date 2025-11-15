@@ -210,6 +210,38 @@ const loginUser = async (credentials) => {
   };
 };
 
+/**
+ * Update user profile
+ * @param {string} userId - User MongoDB ObjectId
+ * @param {Object} updateData - Fields to update
+ * @returns {Promise<Object>} - Updated user object without password
+ * @throws {Error} - If user not found or update fails
+ */
+const updateUserProfile = async (userId, updateData) => {
+  // Find user by ID
+  const user = await User.findById(userId);
+
+  if (!user) {
+    const error = new Error("User not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Update only provided fields
+  Object.keys(updateData).forEach((key) => {
+    user[key] = updateData[key];
+  });
+
+  // Save updated user (will trigger validation)
+  await user.save();
+
+  // Return user without password
+  const updatedUser = user.toObject();
+  delete updatedUser.password;
+
+  return updatedUser;
+};
+
 module.exports = {
   registerUser,
   findExistingUser,
@@ -219,4 +251,5 @@ module.exports = {
   getUserByEmail,
   getUserByMobileNumber,
   loginUser,
+  updateUserProfile,
 };
