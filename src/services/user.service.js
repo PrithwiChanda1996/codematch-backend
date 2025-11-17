@@ -1,6 +1,9 @@
 const User = require("../models/user.model");
-const jwt = require("jsonwebtoken");
-const { jwtConfig } = require("../config/config");
+const {
+  generateAccessToken,
+  generateRefreshToken,
+  storeRefreshToken,
+} = require("./token.service");
 
 /**
  * Check if a user exists by email, username, or mobile number
@@ -48,29 +51,13 @@ const createUser = async (userData) => {
 };
 
 /**
- * Generate JWT token for a user
- * @param {Object} user - User document
- * @returns {string} - JWT token
- */
-const generateToken = (user) => {
-  return jwt.sign(
-    {
-      id: user._id,
-      username: user.username,
-      email: user.email,
-    },
-    jwtConfig.secret,
-    { expiresIn: jwtConfig.expiresIn }
-  );
-};
-
-/**
  * Register a new user
  * @param {Object} userData - User registration data
- * @returns {Promise<Object>} - Object containing user info and token
+ * @param {Object} req - Express request object (for metadata)
+ * @returns {Promise<Object>} - Object containing user info and tokens
  * @throws {Error} - If user already exists or validation fails
  */
-const registerUser = async (userData) => {
+const registerUser = async (userData, req = {}) => {
   const { email, username, mobileNumber } = userData;
 
   // Check if user already exists
@@ -110,14 +97,19 @@ const registerUser = async (userData) => {
   // Create new user (password will be hashed by pre-save middleware)
   const newUser = await createUser(userData);
 
-  // Generate JWT token
-  const token = generateToken(newUser);
+  // Generate tokens
+  const accessToken = generateAccessToken(newUser);
+  const refreshToken = generateRefreshToken(newUser);
+
+  // Store refresh token in database
+  await storeRefreshToken(refreshToken, newUser._id, req);
 
   // Return only required fields
   return {
     id: newUser._id,
     username: newUser.username,
-    token,
+    accessToken,
+    refreshToken,
   };
 };
 
@@ -184,10 +176,11 @@ const getUserByMobileNumber = async (mobileNumber) => {
  * @param {string} [credentials.email] - User email
  * @param {string} [credentials.username] - Username
  * @param {string} [credentials.mobileNumber] - Mobile number
- * @returns {Promise<Object>} - Object containing user info and token
+ * @param {Object} req - Express request object (for metadata)
+ * @returns {Promise<Object>} - Object containing user info and tokens
  * @throws {Error} - If user not found or password is invalid
  */
-const loginUser = async (credentials) => {
+const loginUser = async (credentials, req = {}) => {
   const { email, username, mobileNumber, password } = credentials;
 
   // Find user by email, username, or mobile number
@@ -216,14 +209,19 @@ const loginUser = async (credentials) => {
     throw error;
   }
 
-  // Generate JWT token
-  const token = generateToken(user);
+  // Generate tokens
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
 
-  // Return user info and token
+  // Store refresh token in database
+  await storeRefreshToken(refreshToken, user._id, req);
+
+  // Return user info and tokens
   return {
     id: user._id,
     username: user.username,
-    token,
+    accessToken,
+    refreshToken,
   };
 };
 
@@ -263,7 +261,6 @@ module.exports = {
   registerUser,
   findExistingUser,
   createUser,
-  generateToken,
   getUserById,
   getUserByEmail,
   getUserByMobileNumber,

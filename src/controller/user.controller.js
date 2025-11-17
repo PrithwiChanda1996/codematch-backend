@@ -1,16 +1,30 @@
 const userService = require("../services/user.service");
+const { cookieConfig } = require("../config/config");
+const {
+  verifyRefreshToken,
+  generateAccessToken,
+  revokeRefreshToken,
+  revokeAllUserTokens,
+} = require("../services/token.service");
 
 // Signup controller
 const signup = async (req, res, next) => {
   try {
-    // Call service layer to handle business logic
-    const result = await userService.registerUser(req.body);
+    // Call service layer to handle business logic (pass req for metadata)
+    const result = await userService.registerUser(req.body, req);
 
-    // Send success response
+    // Set refresh token as httpOnly cookie
+    res.cookie("refreshToken", result.refreshToken, cookieConfig);
+
+    // Send success response with only access token
     return res.status(201).json({
       success: true,
       message: "User registered successfully",
-      data: result,
+      data: {
+        id: result.id,
+        username: result.username,
+        accessToken: result.accessToken,
+      },
     });
   } catch (error) {
     next(error);
@@ -65,14 +79,21 @@ const getUserByMobileNumber = async (req, res, next) => {
 // Login controller
 const login = async (req, res, next) => {
   try {
-    // Call service layer to handle authentication
-    const result = await userService.loginUser(req.body);
+    // Call service layer to handle authentication (pass req for metadata)
+    const result = await userService.loginUser(req.body, req);
 
-    // Send success response
+    // Set refresh token as httpOnly cookie
+    res.cookie("refreshToken", result.refreshToken, cookieConfig);
+
+    // Send success response with only access token
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: result,
+      data: {
+        id: result.id,
+        username: result.username,
+        accessToken: result.accessToken,
+      },
     });
   } catch (error) {
     next(error);
@@ -99,6 +120,80 @@ const updateProfile = async (req, res, next) => {
   }
 };
 
+// Refresh access token controller
+const refreshAccessToken = async (req, res, next) => {
+  try {
+    // Get refresh token from cookie
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      const error = new Error("Refresh token not found");
+      error.statusCode = 401;
+      return next(error);
+    }
+
+    // Verify refresh token and get user
+    const user = await verifyRefreshToken(refreshToken);
+
+    // Generate new access token
+    const newAccessToken = generateAccessToken(user);
+
+    // Return new access token
+    return res.status(200).json({
+      success: true,
+      message: "Access token refreshed successfully",
+      data: {
+        accessToken: newAccessToken,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Logout controller (single device)
+const logout = async (req, res, next) => {
+  try {
+    // Get refresh token from cookie
+    const refreshToken = req.cookies.refreshToken;
+
+    if (refreshToken) {
+      // Revoke the refresh token
+      await revokeRefreshToken(refreshToken);
+    }
+
+    // Clear the cookie
+    res.clearCookie("refreshToken", cookieConfig);
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Logout from all devices controller
+const logoutAllDevices = async (req, res, next) => {
+  try {
+    const userId = req.userId; // From authorization middleware
+
+    // Revoke all refresh tokens for this user
+    await revokeAllUserTokens(userId);
+
+    // Clear the cookie
+    res.clearCookie("refreshToken", cookieConfig);
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out from all devices successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   signup,
   getUserById,
@@ -106,4 +201,7 @@ module.exports = {
   getUserByMobileNumber,
   login,
   updateProfile,
+  refreshAccessToken,
+  logout,
+  logoutAllDevices,
 };

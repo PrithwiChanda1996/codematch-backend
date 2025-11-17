@@ -7,6 +7,9 @@ const {
   getUserByMobileNumber,
   login,
   updateProfile,
+  refreshAccessToken,
+  logout,
+  logoutAllDevices,
 } = require("../controller/user.controller");
 const {
   validateSignup,
@@ -26,6 +29,15 @@ router.post("/signup", validateSignup, signup);
 
 // POST /api/users/login - User login
 router.post("/login", validateLogin, login);
+
+// POST /api/users/refresh-token - Refresh access token (public)
+router.post("/refresh-token", refreshAccessToken);
+
+// POST /api/users/logout - Logout from current device (protected)
+router.post("/logout", authenticate, logout);
+
+// POST /api/users/logout-all - Logout from all devices (protected)
+router.post("/logout-all", authenticate, authorizeOwnProfile, logoutAllDevices);
 
 // PATCH /api/users/profile - Update user profile (protected)
 router.patch(

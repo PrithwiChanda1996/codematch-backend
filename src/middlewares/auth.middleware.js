@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 const { jwtConfig } = require("../config/config");
 
 /**
- * Middleware to authenticate JWT token
+ * Middleware to authenticate JWT access token
  * @param {Object} req - Express request object
  * @param {Object} res - Express response object
  * @param {Function} next - Express next middleware function
@@ -19,7 +19,7 @@ const authenticate = (req, res, next) => {
     // Check if Authorization header exists and starts with "Bearer "
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       const error = new Error(
-        "Authentication required. Please provide a valid token"
+        "Authentication required. Please provide a valid access token"
       );
       error.statusCode = 401;
       return next(error);
@@ -28,8 +28,8 @@ const authenticate = (req, res, next) => {
     // Extract token from "Bearer <token>"
     const token = authHeader.split(" ")[1];
 
-    // Verify token
-    const decoded = jwt.verify(token, jwtConfig.secret);
+    // Verify access token using access token secret
+    const decoded = jwt.verify(token, jwtConfig.accessTokenSecret);
 
     // Attach decoded user information to request object
     req.user = decoded;
@@ -37,8 +37,15 @@ const authenticate = (req, res, next) => {
     // Proceed to next middleware
     next();
   } catch (error) {
-    // JWT verification errors will be caught here
-    // These are handled by the error middleware (JsonWebTokenError, TokenExpiredError)
+    // Handle JWT verification errors
+    if (error.name === "TokenExpiredError") {
+      error.message = "Access token has expired. Please refresh your token.";
+      error.statusCode = 401;
+      error.code = "TOKEN_EXPIRED"; // Special code for client to trigger refresh
+    } else if (error.name === "JsonWebTokenError") {
+      error.message = "Invalid access token";
+      error.statusCode = 401;
+    }
     next(error);
   }
 };
