@@ -63,6 +63,7 @@ export const createMockModel = (mockData: any) => {
   model.deleteMany = jest.fn();
   model.create = jest.fn();
   model.countDocuments = jest.fn();
+  model.aggregate = jest.fn();
 
   return model;
 };
@@ -85,6 +86,7 @@ export const createMockMongooseModel = (mockData?: any) => {
   model.deleteMany = jest.fn();
   model.create = jest.fn();
   model.countDocuments = jest.fn();
+  model.aggregate = jest.fn();
 
   return model;
 };

@@ -19,6 +19,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OwnerGuard } from './guards/owner.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { UserSuggestionDto } from './dto/user-suggestions-response.dto';
 
 @ApiTags('users')
 @ApiBearerAuth('JWT-auth')
@@ -26,6 +27,30 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
+
+  @Get('suggestions')
+  @ApiOperation({ 
+    summary: 'Get user suggestions for connection',
+    description: 'Get a list of suggested users to connect with, excluding users you have already connected with, sent requests to, or been blocked by'
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'List of suggested users',
+    type: [UserSuggestionDto]
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized - invalid token' 
+  })
+  async getSuggestions(@CurrentUser('id') userId: string) {
+    const suggestions = await this.usersService.getSuggestions(userId);
+
+    return {
+      success: true,
+      count: suggestions.length,
+      data: suggestions,
+    };
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get user by ID' })

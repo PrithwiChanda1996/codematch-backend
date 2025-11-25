@@ -14,6 +14,7 @@ describe('UsersController', () => {
       findByEmail: jest.fn(),
       findByMobile: jest.fn(),
       updateProfile: jest.fn(),
+      getSuggestions: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -94,6 +95,51 @@ describe('UsersController', () => {
         message: 'Profile updated successfully',
         data: updatedUser,
       });
+    });
+  });
+
+  describe('getSuggestions', () => {
+    it('should return suggestions with count and success response', async () => {
+      const userId = '507f1f77bcf86cd799439011';
+      const suggestions = [
+        { _id: '507f1f77bcf86cd799439012', firstName: 'Jane', lastName: 'Doe' },
+        { _id: '507f1f77bcf86cd799439013', firstName: 'Bob', lastName: 'Smith' },
+      ];
+      
+      usersService.getSuggestions.mockResolvedValue(suggestions as any);
+
+      const result = await controller.getSuggestions(userId);
+
+      expect(usersService.getSuggestions).toHaveBeenCalledWith(userId);
+      expect(result).toEqual({
+        success: true,
+        count: 2,
+        data: suggestions,
+      });
+    });
+
+    it('should return empty array when no suggestions available', async () => {
+      const userId = '507f1f77bcf86cd799439011';
+      usersService.getSuggestions.mockResolvedValue([]);
+
+      const result = await controller.getSuggestions(userId);
+
+      expect(usersService.getSuggestions).toHaveBeenCalledWith(userId);
+      expect(result).toEqual({
+        success: true,
+        count: 0,
+        data: [],
+      });
+    });
+
+    it('should call service with correct user ID from JWT', async () => {
+      const userId = '507f1f77bcf86cd799439011';
+      usersService.getSuggestions.mockResolvedValue([]);
+
+      await controller.getSuggestions(userId);
+
+      expect(usersService.getSuggestions).toHaveBeenCalledWith(userId);
+      expect(usersService.getSuggestions).toHaveBeenCalledTimes(1);
     });
   });
 });

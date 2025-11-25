@@ -1,17 +1,21 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { getModelToken } from '@nestjs/mongoose';
+import { Types } from 'mongoose';
 import { UsersService } from './users.service';
 import { User } from './entities/user.entity';
+import { Connection } from '../connections/entities/connection.entity';
 import { createMockModel, mockUser } from '../../test/helpers/mock-factories';
 import { validUpdateUserDto } from '../../test/helpers/test-fixtures';
 
 describe('UsersService', () => {
   let service: UsersService;
   let userModel: any;
+  let connectionModel: any;
 
   beforeEach(async () => {
     const mockUserModel = createMockModel(mockUser());
+    const mockConnectionModel = createMockModel({});
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -20,11 +24,16 @@ describe('UsersService', () => {
           provide: getModelToken(User.name),
           useValue: mockUserModel,
         },
+        {
+          provide: getModelToken(Connection.name),
+          useValue: mockConnectionModel,
+        },
       ],
     }).compile();
 
     service = module.get<UsersService>(UsersService);
     userModel = module.get(getModelToken(User.name));
+    connectionModel = module.get(getModelToken(Connection.name));
   });
 
   it('should be defined', () => {
@@ -155,6 +164,159 @@ describe('UsersService', () => {
 
       expect(user.save).toHaveBeenCalled();
       expect(selectMock).toHaveBeenCalledWith('-password');
+    });
+  });
+
+  describe('getSuggestions', () => {
+    const userId = '507f1f77bcf86cd799439011';
+    const user2Id = '507f1f77bcf86cd799439012';
+    const user3Id = '507f1f77bcf86cd799439013';
+    const user4Id = '507f1f77bcf86cd799439014';
+
+    it('should return users excluding self', async () => {
+      connectionModel.find.mockResolvedValue([]);
+      
+      const suggestedUsers = [
+        { _id: user2Id, firstName: 'Jane', lastName: 'Doe' },
+        { _id: user3Id, firstName: 'Bob', lastName: 'Smith' },
+      ];
+      
+      userModel.aggregate.mockResolvedValue(suggestedUsers);
+
+      const result = await service.getSuggestions(userId);
+
+      expect(connectionModel.find).toHaveBeenCalledWith({
+        $or: [
+          { fromUserId: new Types.ObjectId(userId), status: { $in: ['pending', 'accepted', 'blocked'] } },
+          { toUserId: new Types.ObjectId(userId), status: { $in: ['pending', 'accepted', 'blocked'] } }
+        ]
+      });
+      expect(userModel.aggregate).toHaveBeenCalled();
+      expect(result).toEqual(suggestedUsers);
+      expect(result.length).toBe(2);
+    });
+
+    it('should exclude users with pending sent requests', async () => {
+      const connections = [
+        {
+          fromUserId: new Types.ObjectId(userId),
+          toUserId: new Types.ObjectId(user2Id),
+          status: 'pending',
+        },
+      ];
+      
+      connectionModel.find.mockResolvedValue(connections);
+      
+      const suggestedUsers = [{ _id: user3Id, firstName: 'Bob', lastName: 'Smith' }];
+      userModel.aggregate.mockResolvedValue(suggestedUsers);
+
+      const result = await service.getSuggestions(userId);
+
+      expect(result).toEqual(suggestedUsers);
+      expect(result.some((u: any) => u._id === user2Id)).toBe(false);
+    });
+
+    it('should exclude users with pending received requests', async () => {
+      const connections = [
+        {
+          fromUserId: new Types.ObjectId(user2Id),
+          toUserId: new Types.ObjectId(userId),
+          status: 'pending',
+        },
+      ];
+      
+      connectionModel.find.mockResolvedValue(connections);
+      
+      const suggestedUsers = [{ _id: user3Id, firstName: 'Bob', lastName: 'Smith' }];
+      userModel.aggregate.mockResolvedValue(suggestedUsers);
+
+      const result = await service.getSuggestions(userId);
+
+      expect(result).toEqual(suggestedUsers);
+      expect(result.some((u: any) => u._id === user2Id)).toBe(false);
+    });
+
+    it('should exclude mutual friends (accepted connections)', async () => {
+      const connections = [
+        {
+          fromUserId: new Types.ObjectId(userId),
+          toUserId: new Types.ObjectId(user2Id),
+          status: 'accepted',
+        },
+      ];
+      
+      connectionModel.find.mockResolvedValue(connections);
+      
+      const suggestedUsers = [{ _id: user3Id, firstName: 'Bob', lastName: 'Smith' }];
+      userModel.aggregate.mockResolvedValue(suggestedUsers);
+
+      const result = await service.getSuggestions(userId);
+
+      expect(result).toEqual(suggestedUsers);
+      expect(result.some((u: any) => u._id === user2Id)).toBe(false);
+    });
+
+    it('should exclude blocked users (bidirectional)', async () => {
+      const connections = [
+        {
+          fromUserId: new Types.ObjectId(userId),
+          toUserId: new Types.ObjectId(user2Id),
+          status: 'blocked',
+        },
+        {
+          fromUserId: new Types.ObjectId(user3Id),
+          toUserId: new Types.ObjectId(userId),
+          status: 'blocked',
+        },
+      ];
+      
+      connectionModel.find.mockResolvedValue(connections);
+      
+      const suggestedUsers = [{ _id: user4Id, firstName: 'Alice', lastName: 'Johnson' }];
+      userModel.aggregate.mockResolvedValue(suggestedUsers);
+
+      const result = await service.getSuggestions(userId);
+
+      expect(result).toEqual(suggestedUsers);
+      expect(result.some((u: any) => u._id === user2Id)).toBe(false);
+      expect(result.some((u: any) => u._id === user3Id)).toBe(false);
+    });
+
+    it('should return empty array when all users are excluded', async () => {
+      connectionModel.find.mockResolvedValue([]);
+      userModel.aggregate.mockResolvedValue([]);
+
+      const result = await service.getSuggestions(userId);
+
+      expect(result).toEqual([]);
+      expect(result.length).toBe(0);
+    });
+
+    it('should use random sampling in aggregation', async () => {
+      connectionModel.find.mockResolvedValue([]);
+      userModel.aggregate.mockResolvedValue([]);
+
+      await service.getSuggestions(userId);
+
+      const aggregateCall = userModel.aggregate.mock.calls[0][0];
+      expect(aggregateCall).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ $sample: { size: 1000 } }),
+          expect.objectContaining({ $project: { password: 0 } }),
+        ])
+      );
+    });
+
+    it('should exclude password field from results', async () => {
+      connectionModel.find.mockResolvedValue([]);
+      userModel.aggregate.mockResolvedValue([]);
+
+      await service.getSuggestions(userId);
+
+      const aggregateCall = userModel.aggregate.mock.calls[0][0];
+      const projectStage = aggregateCall.find((stage: any) => stage.$project);
+      expect(projectStage).toBeDefined();
+      expect(projectStage.$project.password).toBe(0);
     });
   });
 });
