@@ -17,6 +17,7 @@ describe('TokensService', () => {
   let service: TokensService;
   let refreshTokenModel: any;
   let jwtService: jest.Mocked<JwtService>;
+  let configService: jest.Mocked<ConfigService>;
 
   beforeEach(async () => {
     const mockRefreshTokenModel = createMockModel(mockRefreshToken());
