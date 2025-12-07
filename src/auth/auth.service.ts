@@ -75,8 +75,6 @@ export class AuthService {
 
     return {
       user: {
-        id: newUser._id.toString(),
-        username: newUser.username,
         accessToken,
       },
       refreshToken,
@@ -124,8 +122,6 @@ export class AuthService {
 
     return {
       user: {
-        id: user._id.toString(),
-        username: user.username,
         accessToken,
       },
       refreshToken,

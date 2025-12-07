@@ -71,8 +71,6 @@ describe('AuthService', () => {
         ],
       });
       expect(result.user).toEqual({
-        id: newUser._id.toString(),
-        username: newUser.username,
         accessToken: 'mock-access-token',
       });
       expect(result.refreshToken).toBe('mock-refresh-token');
@@ -150,8 +148,6 @@ describe('AuthService', () => {
       expect(userModel.findOne).toHaveBeenCalledWith({ email: validLoginDto.email.toLowerCase() });
       expect(user.comparePassword).toHaveBeenCalledWith(validLoginDto.password);
       expect(result.user).toEqual({
-        id: user._id.toString(),
-        username: user.username,
         accessToken: 'mock-access-token',
       });
       expect(result.refreshToken).toBe('mock-refresh-token');

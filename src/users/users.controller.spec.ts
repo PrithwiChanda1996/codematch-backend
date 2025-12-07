@@ -98,6 +98,23 @@ describe('UsersController', () => {
     });
   });
 
+  describe('getProfile', () => {
+    it('should return current user profile with success message', async () => {
+      const user = mockUser();
+      const userId = '507f1f77bcf86cd799439011';
+      usersService.findById.mockResolvedValue(user as any);
+
+      const result = await controller.getProfile(userId);
+
+      expect(usersService.findById).toHaveBeenCalledWith(userId);
+      expect(result).toEqual({
+        success: true,
+        message: 'Profile retrieved successfully',
+        data: user,
+      });
+    });
+  });
+
   describe('getSuggestions', () => {
     it('should return random suggestions', async () => {
       const userId = '507f1f77bcf86cd799439011';

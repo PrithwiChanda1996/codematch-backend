@@ -52,8 +52,6 @@ describe('AuthController', () => {
     it('should create a new user and set refresh token cookie', async () => {
       const mockResult = {
         user: {
-          id: '507f1f77bcf86cd799439011',
-          username: 'johndoe',
           accessToken: 'mock-access-token',
         },
         refreshToken: 'mock-refresh-token',
@@ -88,8 +86,6 @@ describe('AuthController', () => {
     it('should login user and set refresh token cookie', async () => {
       const mockResult = {
         user: {
-          id: '507f1f77bcf86cd799439011',
-          username: 'johndoe',
           accessToken: 'mock-access-token',
         },
         refreshToken: 'mock-refresh-token',

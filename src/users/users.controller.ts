@@ -10,6 +10,7 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { ProfileResponseDto } from './dto/profile-response.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OwnerGuard } from './guards/owner.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -61,6 +62,27 @@ export class UsersController {
     return {
       success: true,
       data: suggestions,
+    };
+  }
+
+  @Get('profile')
+  @ApiOperation({
+    summary: 'Get current user profile',
+    description: 'Returns full profile data of the currently logged-in user',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Profile data retrieved successfully',
+    type: ProfileResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid token' })
+  async getProfile(@CurrentUser('id') userId: string) {
+    const user = await this.usersService.findById(userId);
+
+    return {
+      success: true,
+      message: 'Profile retrieved successfully',
+      data: user,
     };
   }
 
