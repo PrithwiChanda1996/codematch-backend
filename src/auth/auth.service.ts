@@ -99,13 +99,13 @@ export class AuthService {
     }
 
     if (!user) {
-      throw new NotFoundException('User not found. Please sign up first');
+      throw new NotFoundException('Invalid credentials');
     }
 
     // Verify password
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid password');
+      throw new UnauthorizedException('Invalid credentials');
     }
 
     // Generate tokens

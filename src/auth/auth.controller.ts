@@ -66,7 +66,7 @@ export class AuthController {
   })
   @ApiResponse({ status: 400, description: 'Bad request - validation error' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  @ApiResponse({ status: 404, description: 'User not found. Please sign up first' })
+  @ApiResponse({ status: 404, description: 'Invalid credentials' })
   async login(
     @Body() loginDto: LoginDto,
     @Req() req: Request,
