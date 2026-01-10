@@ -229,6 +229,37 @@ export class ConnectionsService {
     await this.connectionModel.findByIdAndDelete(connection._id);
   }
 
+  async disconnectConnection(connectionId: string, userId: string): Promise<void> {
+    // Validate MongoDB ObjectId format
+    if (!Types.ObjectId.isValid(connectionId)) {
+      throw new BadRequestException('Invalid connection ID format');
+    }
+
+    const connection = await this.connectionModel.findById(connectionId);
+
+    if (!connection) {
+      throw new NotFoundException('Connection not found');
+    }
+
+    // Verify connection status is accepted
+    if (connection.status !== ConnectionStatus.ACCEPTED) {
+      throw new BadRequestException(
+        `Cannot disconnect connection with status: ${connection.status}`,
+      );
+    }
+
+    // Verify user is part of this connection (either fromUserId or toUserId)
+    const isUserPartOfConnection =
+      connection.fromUserId.toString() === userId || connection.toUserId.toString() === userId;
+
+    if (!isUserPartOfConnection) {
+      throw new ForbiddenException('Forbidden - You are not part of this connection');
+    }
+
+    // Delete the connection document
+    await this.connectionModel.findByIdAndDelete(connectionId);
+  }
+
   async getReceivedRequests(userId: string): Promise<ConnectionDocument[]> {
     return this.connectionModel
       .find({

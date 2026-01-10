@@ -233,6 +233,43 @@ export class ConnectionsController {
     };
   }
 
+  @Delete(':id/disconnect')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Disconnect from an accepted connection',
+    description:
+      'Disconnect from a mutual connection (accepted status). This deletes the connection and allows you to reconnect later. Either user in the connection can disconnect.',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Connection ID to disconnect',
+    example: '507f1f77bcf86cd799439011',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully disconnected',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - Invalid ID format or connection not accepted',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Forbidden - Not part of this connection',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Connection not found',
+  })
+  async disconnectConnection(@CurrentUser('id') userId: string, @Param('id') connectionId: string) {
+    await this.connectionsService.disconnectConnection(connectionId, userId);
+
+    return {
+      success: true,
+      message: 'Successfully disconnected',
+    };
+  }
+
   @Get('received')
   @ApiOperation({
     summary: 'Get received connection requests',

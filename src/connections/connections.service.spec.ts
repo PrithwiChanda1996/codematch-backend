@@ -439,6 +439,133 @@ describe('ConnectionsService', () => {
     });
   });
 
+  describe('disconnectConnection', () => {
+    it('should successfully disconnect from an accepted connection', async () => {
+      const mockConnection = {
+        _id: mockConnectionId,
+        fromUserId: { toString: () => mockUserId },
+        toUserId: { toString: () => mockTargetUserId },
+        status: ConnectionStatus.ACCEPTED,
+      };
+
+      connectionModel.findById.mockResolvedValue(mockConnection);
+      connectionModel.findByIdAndDelete.mockResolvedValue(mockConnection);
+
+      await service.disconnectConnection(mockConnectionId, mockUserId);
+
+      expect(connectionModel.findById).toHaveBeenCalledWith(mockConnectionId);
+      expect(connectionModel.findByIdAndDelete).toHaveBeenCalledWith(mockConnectionId);
+    });
+
+    it('should successfully disconnect when user is the toUserId', async () => {
+      const mockConnection = {
+        _id: mockConnectionId,
+        fromUserId: { toString: () => mockTargetUserId },
+        toUserId: { toString: () => mockUserId },
+        status: ConnectionStatus.ACCEPTED,
+      };
+
+      connectionModel.findById.mockResolvedValue(mockConnection);
+      connectionModel.findByIdAndDelete.mockResolvedValue(mockConnection);
+
+      await service.disconnectConnection(mockConnectionId, mockUserId);
+
+      expect(connectionModel.findByIdAndDelete).toHaveBeenCalledWith(mockConnectionId);
+    });
+
+    it('should throw BadRequestException for invalid connection ID format', async () => {
+      await expect(service.disconnectConnection('invalid-id', mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.disconnectConnection('invalid-id', mockUserId)).rejects.toThrow(
+        'Invalid connection ID format',
+      );
+    });
+
+    it('should throw NotFoundException if connection not found', async () => {
+      connectionModel.findById.mockResolvedValue(null);
+
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        NotFoundException,
+      );
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        'Connection not found',
+      );
+    });
+
+    it('should throw BadRequestException if connection status is pending', async () => {
+      const mockConnection = {
+        _id: mockConnectionId,
+        fromUserId: { toString: () => mockUserId },
+        toUserId: { toString: () => mockTargetUserId },
+        status: ConnectionStatus.PENDING,
+      };
+
+      connectionModel.findById.mockResolvedValue(mockConnection);
+
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        'Cannot disconnect connection with status: pending',
+      );
+    });
+
+    it('should throw BadRequestException if connection status is rejected', async () => {
+      const mockConnection = {
+        _id: mockConnectionId,
+        fromUserId: { toString: () => mockUserId },
+        toUserId: { toString: () => mockTargetUserId },
+        status: ConnectionStatus.REJECTED,
+      };
+
+      connectionModel.findById.mockResolvedValue(mockConnection);
+
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        'Cannot disconnect connection with status: rejected',
+      );
+    });
+
+    it('should throw BadRequestException if connection status is blocked', async () => {
+      const mockConnection = {
+        _id: mockConnectionId,
+        fromUserId: { toString: () => mockUserId },
+        toUserId: { toString: () => mockTargetUserId },
+        status: ConnectionStatus.BLOCKED,
+      };
+
+      connectionModel.findById.mockResolvedValue(mockConnection);
+
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        'Cannot disconnect connection with status: blocked',
+      );
+    });
+
+    it('should throw ForbiddenException if user is not part of the connection', async () => {
+      const mockConnection = {
+        _id: mockConnectionId,
+        fromUserId: { toString: () => mockTargetUserId },
+        toUserId: { toString: () => '507f1f77bcf86cd799439099' },
+        status: ConnectionStatus.ACCEPTED,
+      };
+
+      connectionModel.findById.mockResolvedValue(mockConnection);
+
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.disconnectConnection(mockConnectionId, mockUserId)).rejects.toThrow(
+        'Forbidden - You are not part of this connection',
+      );
+    });
+  });
+
   describe('getReceivedRequests', () => {
     it('should return received connection requests', async () => {
       const mockRequests = [

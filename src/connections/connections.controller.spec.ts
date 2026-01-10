@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException } from '@nestjs/common';
 import { ConnectionsController } from './connections.controller';
 import { ConnectionsService } from './connections.service';
 import { ConnectionStatus } from './entities/connection.entity';
@@ -9,6 +10,7 @@ describe('ConnectionsController', () => {
 
   const mockUserId = '507f1f77bcf86cd799439011';
   const mockTargetUserId = '507f1f77bcf86cd799439012';
+  const mockConnectionId = '507f1f77bcf86cd799439013';
 
   const mockConnectionsService = {
     sendConnectionRequest: jest.fn(),
@@ -17,6 +19,7 @@ describe('ConnectionsController', () => {
     cancelRequest: jest.fn(),
     blockUser: jest.fn(),
     unblockUser: jest.fn(),
+    disconnectConnection: jest.fn(),
     getReceivedRequests: jest.fn(),
     getSentRequests: jest.fn(),
     getConnections: jest.fn(),
@@ -136,6 +139,29 @@ describe('ConnectionsController', () => {
 
       expect(result.message).toBe('User unblocked successfully');
       expect(service.unblockUser).toHaveBeenCalledWith(mockUserId, mockTargetUserId);
+    });
+  });
+
+  describe('disconnectConnection', () => {
+    it('should disconnect from an accepted connection successfully', async () => {
+      mockConnectionsService.disconnectConnection.mockResolvedValue(undefined);
+
+      const result = await controller.disconnectConnection(mockUserId, mockConnectionId);
+
+      expect(result.success).toBe(true);
+      expect(result.message).toBe('Successfully disconnected');
+      expect(service.disconnectConnection).toHaveBeenCalledWith(mockConnectionId, mockUserId);
+    });
+
+    it('should handle errors when connection not found', async () => {
+      mockConnectionsService.disconnectConnection.mockRejectedValue(
+        new BadRequestException('Connection not found'),
+      );
+
+      await expect(controller.disconnectConnection(mockUserId, mockConnectionId)).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(service.disconnectConnection).toHaveBeenCalledWith(mockConnectionId, mockUserId);
     });
   });
 
