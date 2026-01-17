@@ -330,6 +330,26 @@ export class ConnectionsController {
     };
   }
 
+  @Get('blocked')
+  @ApiOperation({
+    summary: 'Get blocked users',
+    description: 'Get all users that you have blocked',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of blocked users',
+    type: [ConnectionResponseDto],
+  })
+  async getBlockedUsers(@CurrentUser('id') userId: string) {
+    const blockedUsers = await this.connectionsService.getBlockedUsers(userId);
+
+    return {
+      message: 'Blocked users retrieved successfully',
+      count: blockedUsers.length,
+      data: blockedUsers,
+    };
+  }
+
   @Get('status/:userId')
   @ApiOperation({
     summary: 'Check connection status with a user',

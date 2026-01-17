@@ -296,6 +296,17 @@ export class ConnectionsService {
       .exec();
   }
 
+  async getBlockedUsers(userId: string): Promise<ConnectionDocument[]> {
+    return this.connectionModel
+      .find({
+        fromUserId: new Types.ObjectId(userId),
+        status: ConnectionStatus.BLOCKED,
+      })
+      .populate('toUserId', 'username firstName lastName profilePhoto')
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
   async getConnectionStatus(
     userId: string,
     targetUserId: string,
