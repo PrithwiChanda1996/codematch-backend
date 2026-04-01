@@ -3,21 +3,84 @@ import {
   ConflictException,
   NotFoundException,
   UnauthorizedException,
+  BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
+import { createHash, randomBytes } from 'crypto';
 import { User, UserDocument } from '../users/entities/user.entity';
 import { TokensService } from '../tokens/tokens.service';
+import { MailService } from '../mail/mail.service';
 import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
+
+const FORGOT_PASSWORD_RESPONSE_MESSAGE =
+  'If an account exists for that email, we sent password reset instructions.';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private tokensService: TokensService,
+    private mailService: MailService,
+    private configService: ConfigService,
   ) {}
+
+  getForgotPasswordResponseMessage(): string {
+    return FORGOT_PASSWORD_RESPONSE_MESSAGE;
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    const user = await this.userModel.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      return;
+    }
+
+    const plainToken = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(plainToken).digest('hex');
+    const ttlMs = this.configService.get<number>('passwordResetTokenTtlMs');
+    user.passwordResetTokenHash = tokenHash;
+    user.passwordResetExpires = new Date(Date.now() + ttlMs);
+    await user.save();
+
+    const baseUrl = this.configService.get<string>('frontendUrl').replace(/\/$/, '');
+    const pathSegment = this.configService.get<string>('passwordResetPath').replace(/^\/+/, '');
+    const resetLink = `${baseUrl}/${pathSegment}?token=${encodeURIComponent(plainToken)}`;
+
+    try {
+      await this.mailService.sendPasswordResetEmail(user.email, resetLink);
+    } catch (error) {
+      user.passwordResetTokenHash = undefined;
+      user.passwordResetExpires = undefined;
+      await user.save();
+      throw new InternalServerErrorException(
+        'Unable to send reset email. Please try again later.',
+      );
+    }
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const user = await this.userModel
+      .findOne({
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpires: { $gt: new Date() },
+      })
+      .select('+passwordResetTokenHash +passwordResetExpires');
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    user.password = newPassword;
+    user.passwordResetTokenHash = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+    await this.tokensService.revokeAllUserTokens(user._id.toString());
+  }
 
   async signup(
     signupDto: SignupDto,

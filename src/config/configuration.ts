@@ -1,5 +1,13 @@
+const ONE_HOUR_MS = 60 * 60 * 1000;
+
 export default () => ({
   port: parseInt(process.env.PORT, 10) || 3000,
+  frontendUrl: process.env.FRONTEND_URL,
+  passwordResetPath: process.env.PASSWORD_RESET_PATH || 'reset-password',
+  passwordResetTokenTtlMs: parseInt(process.env.PASSWORD_RESET_TOKEN_TTL_MS ?? '', 10) || ONE_HOUR_MS,
+  ses: {
+    fromEmail: process.env.SES_FROM_EMAIL,
+  },
   database: {
     uri: process.env.MONGODB_URI,
   },

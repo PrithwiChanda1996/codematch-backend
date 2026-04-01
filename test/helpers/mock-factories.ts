@@ -103,7 +103,7 @@ export const mockJwtService = () => ({
 
 export const mockConfigService = () => ({
   get: jest.fn((key: string) => {
-    const config = {
+    const config: Record<string, unknown> = {
       'jwt.accessSecret': 'test-access-secret',
       'jwt.refreshSecret': 'test-refresh-secret',
       'jwt.accessExpiry': '15m',
@@ -114,6 +114,10 @@ export const mockConfigService = () => ({
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       },
+      passwordResetTokenTtlMs: 60 * 60 * 1000,
+      frontendUrl: 'http://localhost:5173',
+      passwordResetPath: 'reset-password',
+      'ses.fromEmail': 'noreply@test.com',
     };
     return config[key];
   }),

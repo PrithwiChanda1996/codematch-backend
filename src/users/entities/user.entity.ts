@@ -96,6 +96,12 @@ export class User {
   })
   portfolioUrl?: string;
 
+  @Prop({ select: false })
+  passwordResetTokenHash?: string;
+
+  @Prop({ select: false })
+  passwordResetExpires?: Date;
+
   // Method to compare passwords
   async comparePassword(candidatePassword: string): Promise<boolean> {
     return bcrypt.compare(candidatePassword, this.password);

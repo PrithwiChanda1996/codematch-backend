@@ -1,10 +1,19 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { getModelToken } from '@nestjs/mongoose';
+import { createHash, randomBytes } from 'crypto';
 import { AuthService } from './auth.service';
 import { TokensService } from '../tokens/tokens.service';
+import { MailService } from '../mail/mail.service';
 import { User } from '../users/entities/user.entity';
-import { createMockModel, mockUser } from '../../test/helpers/mock-factories';
+import { createMockModel, mockUser, mockConfigService } from '../../test/helpers/mock-factories';
 import {
   validSignupDto,
   validLoginDto,
@@ -16,6 +25,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let userModel: any;
   let tokensService: jest.Mocked<TokensService>;
+  let mailService: jest.Mocked<Pick<MailService, 'sendPasswordResetEmail'>>;
 
   beforeEach(async () => {
     const mockUserModel = createMockModel(mockUser());
@@ -29,6 +39,10 @@ describe('AuthService', () => {
       revokeAllUserTokens: jest.fn().mockResolvedValue(undefined),
     };
 
+    const mockMailService = {
+      sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -40,12 +54,21 @@ describe('AuthService', () => {
           provide: TokensService,
           useValue: mockTokensService,
         },
+        {
+          provide: MailService,
+          useValue: mockMailService,
+        },
+        {
+          provide: ConfigService,
+          useValue: mockConfigService(),
+        },
       ],
     }).compile();
 
     service = module.get<AuthService>(AuthService);
     userModel = module.get(getModelToken(User.name));
     tokensService = module.get(TokensService);
+    mailService = module.get(MailService);
   });
 
   it('should be defined', () => {
@@ -195,7 +218,7 @@ describe('AuthService', () => {
       userModel.findOne.mockResolvedValue(null);
 
       await expect(service.login(validLoginDto)).rejects.toThrow(
-        new NotFoundException('User not found. Please sign up first'),
+        new NotFoundException('Invalid credentials'),
       );
     });
 
@@ -203,7 +226,7 @@ describe('AuthService', () => {
       userModel.findOne.mockResolvedValue(null);
 
       await expect(service.login(validLoginWithUsernameDto)).rejects.toThrow(
-        new NotFoundException('User not found. Please sign up first'),
+        new NotFoundException('Invalid credentials'),
       );
     });
 
@@ -211,7 +234,7 @@ describe('AuthService', () => {
       userModel.findOne.mockResolvedValue(null);
 
       await expect(service.login(validLoginWithMobileDto)).rejects.toThrow(
-        new NotFoundException('User not found. Please sign up first'),
+        new NotFoundException('Invalid credentials'),
       );
     });
 
@@ -220,8 +243,91 @@ describe('AuthService', () => {
       userModel.findOne.mockResolvedValue(user);
 
       await expect(service.login(validLoginDto)).rejects.toThrow(
-        new UnauthorizedException('Invalid password'),
+        new UnauthorizedException('Invalid credentials'),
       );
+    });
+  });
+
+  describe('requestPasswordReset', () => {
+    it('should not send email when user does not exist', async () => {
+      userModel.findOne.mockResolvedValue(null);
+
+      await service.requestPasswordReset('missing@example.com');
+
+      expect(mailService.sendPasswordResetEmail).not.toHaveBeenCalled();
+    });
+
+    it('should set token, save user, and send email when user exists', async () => {
+      const user = mockUser() as ReturnType<typeof mockUser> & {
+        passwordResetTokenHash?: string;
+        passwordResetExpires?: Date;
+      };
+      user.save = jest.fn().mockResolvedValue(user);
+      userModel.findOne.mockResolvedValue(user);
+
+      await service.requestPasswordReset(user.email);
+
+      expect(user.passwordResetTokenHash).toBeDefined();
+      expect(user.passwordResetExpires).toBeInstanceOf(Date);
+      expect(user.save).toHaveBeenCalled();
+      expect(mailService.sendPasswordResetEmail).toHaveBeenCalledWith(
+        user.email,
+        expect.stringMatching(/^http:\/\/localhost:5173\/reset-password\?token=/),
+      );
+    });
+
+    it('should clear token and throw when email send fails', async () => {
+      const user = mockUser() as ReturnType<typeof mockUser> & {
+        passwordResetTokenHash?: string;
+        passwordResetExpires?: Date;
+      };
+      user.save = jest.fn().mockResolvedValue(user);
+      userModel.findOne.mockResolvedValue(user);
+      mailService.sendPasswordResetEmail.mockRejectedValueOnce(new Error('SES error'));
+
+      await expect(service.requestPasswordReset(user.email)).rejects.toThrow(
+        InternalServerErrorException,
+      );
+      expect(user.passwordResetTokenHash).toBeUndefined();
+      expect(user.passwordResetExpires).toBeUndefined();
+      expect(user.save).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should update password, clear reset fields, and revoke refresh tokens', async () => {
+      const plainToken = randomBytes(16).toString('base64url');
+      const tokenHash = createHash('sha256').update(plainToken).digest('hex');
+      const user = mockUser({
+        passwordResetTokenHash: tokenHash,
+        passwordResetExpires: new Date(Date.now() + 3600000),
+      }) as ReturnType<typeof mockUser> & {
+        passwordResetTokenHash?: string;
+        passwordResetExpires?: Date;
+      };
+      user.save = jest.fn().mockResolvedValue(user);
+      userModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(user),
+      });
+
+      await service.resetPassword(plainToken, 'newPassword1');
+
+      expect(user.password).toBe('newPassword1');
+      expect(user.passwordResetTokenHash).toBeUndefined();
+      expect(user.passwordResetExpires).toBeUndefined();
+      expect(user.save).toHaveBeenCalled();
+      expect(tokensService.revokeAllUserTokens).toHaveBeenCalledWith(user._id.toString());
+    });
+
+    it('should throw BadRequestException for invalid token', async () => {
+      userModel.findOne.mockReturnValue({
+        select: jest.fn().mockResolvedValue(null),
+      });
+
+      await expect(service.resetPassword('bad-token', 'newPassword1')).rejects.toThrow(
+        BadRequestException,
+      );
+      expect(tokensService.revokeAllUserTokens).not.toHaveBeenCalled();
     });
   });
 
