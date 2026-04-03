@@ -25,7 +25,7 @@ describe('AuthService', () => {
   let service: AuthService;
   let userModel: any;
   let tokensService: jest.Mocked<TokensService>;
-  let mailService: jest.Mocked<Pick<MailService, 'sendPasswordResetEmail'>>;
+  let mailService: jest.Mocked<Pick<MailService, 'sendPasswordResetEmail' | 'sendWelcomeEmail'>>;
 
   beforeEach(async () => {
     const mockUserModel = createMockModel(mockUser());
@@ -41,6 +41,7 @@ describe('AuthService', () => {
 
     const mockMailService = {
       sendPasswordResetEmail: jest.fn().mockResolvedValue(undefined),
+      sendWelcomeEmail: jest.fn().mockResolvedValue(undefined),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -105,6 +106,10 @@ describe('AuthService', () => {
         'Mozilla/5.0',
         '127.0.0.1',
       );
+      expect(mailService.sendWelcomeEmail).toHaveBeenCalledWith(
+        newUser.email,
+        validSignupDto.firstName,
+      );
     });
 
     it('should successfully create user without userAgent and ipAddress', async () => {
@@ -123,6 +128,29 @@ describe('AuthService', () => {
         newUser._id.toString(),
         undefined,
         undefined,
+      );
+      expect(mailService.sendWelcomeEmail).toHaveBeenCalledWith(
+        newUser.email,
+        validSignupDto.firstName,
+      );
+    });
+
+    it('should still succeed when welcome email fails', async () => {
+      const newUser = mockUser({ ...validSignupDto });
+      userModel.findOne.mockResolvedValue(null);
+      userModel.mockImplementation(() => ({
+        ...newUser,
+        save: jest.fn().mockResolvedValue(newUser),
+      }));
+      mailService.sendWelcomeEmail.mockRejectedValueOnce(new Error('SES error'));
+
+      const result = await service.signup(validSignupDto);
+
+      expect(result.user.accessToken).toBe('mock-access-token');
+      expect(result.refreshToken).toBe('mock-refresh-token');
+      expect(mailService.sendWelcomeEmail).toHaveBeenCalledWith(
+        newUser.email,
+        validSignupDto.firstName,
       );
     });
 

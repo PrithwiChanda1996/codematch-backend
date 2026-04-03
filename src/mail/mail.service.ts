@@ -45,4 +45,40 @@ export class MailService {
       }),
     );
   }
+
+  async sendWelcomeEmail(to: string, firstName: string): Promise<void> {
+    const fromEmail = this.configService.get<string>('ses.fromEmail');
+    if (!fromEmail) {
+      this.logger.error('SES_FROM_EMAIL is not configured');
+      throw new Error('Email service is not configured');
+    }
+
+    const frontendUrl = this.configService.get<string>('frontendUrl')?.replace(/\/$/, '') ?? '';
+    const bodyLines = [
+      `Hi ${firstName},`,
+      '',
+      'Thanks for signing up for codematch. Your account is ready.',
+      '',
+    ];
+    if (frontendUrl) {
+      bodyLines.push(`Get started: ${frontendUrl}`, '');
+    }
+    bodyLines.push('We are glad you are here.');
+
+    await this.client.send(
+      new SendEmailCommand({
+        Source: fromEmail,
+        Destination: { ToAddresses: [to] },
+        Message: {
+          Subject: {
+            Data: 'Welcome to codematch',
+            Charset: 'UTF-8',
+          },
+          Body: {
+            Text: { Data: bodyLines.join('\n'), Charset: 'UTF-8' },
+          },
+        },
+      }),
+    );
+  }
 }

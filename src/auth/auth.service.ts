@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   ConflictException,
   NotFoundException,
   UnauthorizedException,
@@ -22,6 +23,8 @@ const FORGOT_PASSWORD_RESPONSE_MESSAGE =
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private tokensService: TokensService,
@@ -135,6 +138,14 @@ export class AuthService {
       userAgent,
       ipAddress,
     );
+
+    try {
+      await this.mailService.sendWelcomeEmail(newUser.email, newUser.firstName);
+    } catch (error) {
+      this.logger.warn(
+        `Welcome email failed for ${newUser.email}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     return {
       user: {
